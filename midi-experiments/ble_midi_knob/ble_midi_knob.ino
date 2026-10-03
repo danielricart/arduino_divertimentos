@@ -20,8 +20,10 @@
 #include <hardware/BLEMIDI_ESP32_NimBLE.h>
 
 // ---------- Configuration ----------
-const uint8_t KNOB_ADDRESS    = 0x67;  // I2C address the Knob module is set to
-const uint8_t BUTTONS_ADDRESS = 0x70;  // I2C address the Buttons module is set to
+// Defaults from the Arduino_Modulino library (Knob: 0x74, or 0x76 with the alternate pinstrap).
+// Pass 0xFF to let the library auto-discover the module instead.
+const uint8_t KNOB_ADDRESS    = 0x74;
+const uint8_t BUTTONS_ADDRESS = 0x7C;
 
 const char*   DEVICE_NAME     = "ESP32-C3 MIDI Knob";
 const uint8_t MIDI_CHANNEL    = 1;
@@ -72,6 +74,7 @@ void setup() {
   knob.begin();
   buttons.begin();
   knob.set(0);
+  Serial.printf("Knob at 0x%02X, buttons at 0x%02X\n", knob.getAddress(), buttons.getAddress());
 
   BLEMIDI.setHandleConnected([]() {
     connected = true;
@@ -95,7 +98,7 @@ void loop() {
   lastPoll = millis();
 
   // Knob: clamp the encoder count so it maps directly onto 0..127
-  if (knob.update()) {
+  {
     int count = knob.get();
     int maxCount = 127 / KNOB_STEP;
     if (count < 0) { count = 0; knob.set(0); }
