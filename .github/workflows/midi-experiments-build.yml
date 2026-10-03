@@ -6,7 +6,6 @@ on:
       - "midi-experiments/**"
       - ".github/workflows/midi-experiments-build.yml"
   push:
-    branches: [master]
     paths:
       - "midi-experiments/**"
       - ".github/workflows/midi-experiments-build.yml"
