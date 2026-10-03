@@ -9,7 +9,7 @@ ESP32-C3 acting as a standard BLE MIDI device (no drivers needed on Windows 10/1
 
 ### Setup
 1. Install the esp32 board core (Espressif) and select your ESP32-C3 board.
-2. Library Manager: `BLE-MIDI` (lathoub), `NimBLE-Arduino` (h2zero) **version 1.4.3** (latest 1.x; do not use 2.x, see below), `Modulino` (Arduino).
+2. Library Manager: `BLE-MIDI` (lathoub), `NimBLE-Arduino` (h2zero) **version 1.4.3** (latest 1.x; do not use 2.x, see below), `Arduino_Modulino` (Arduino).
 3. Set `KNOB_ADDRESS` / `BUTTONS_ADDRESS` in the sketch. The modules must already be configured to
    those I2C addresses. Library defaults are Knob 0x74 (0x76 alternate) and Buttons 0x7C; use 0xFF to auto-discover.
 4. Upload, then pair:

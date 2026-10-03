@@ -31,4 +31,4 @@ jobs:
               version: "1.4.3"
             - name: BLE-MIDI
               version: "2.2"
-            - name: Modulino
+            - name: Arduino_Modulino
