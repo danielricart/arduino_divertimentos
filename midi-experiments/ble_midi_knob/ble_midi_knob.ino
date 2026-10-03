@@ -20,7 +20,7 @@
 #include <hardware/BLEMIDI_ESP32_NimBLE.h>
 
 // ---------- Configuration ----------
-// Defaults from the Arduino_Modulino library (Knob: 0x74, or 0x76 with the alternate pinstrap).
+// Defaults from the Arduino_Modulino library. The Knob here uses 0x74 (0x76 is the alternate pinstrap).
 // Pass 0xFF to let the library auto-discover the module instead.
 const uint8_t KNOB_ADDRESS    = 0x74;
 const uint8_t BUTTONS_ADDRESS = 0x7C;
