@@ -23,12 +23,12 @@ jobs:
             - midi-experiments/ble_midi_knob
           platforms: |
             - name: esp32:esp32
-              version: 3.3.12
+              version: "3.3.12"
               source-url: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
           # NimBLE is pinned to 1.4.3 because BLE-MIDI is not compatible with 2.x.
           libraries: |
             - name: NimBLE-Arduino
-              version: 1.4.3
+              version: "1.4.3"
             - name: BLE-MIDI
-              version: 2.2
+              version: "2.2"
             - name: Modulino
