@@ -1,0 +1,35 @@
+name: Build midi-experiments
+
+on:
+  pull_request:
+    paths:
+      - "midi-experiments/**"
+      - ".github/workflows/midi-experiments-build.yml"
+  push:
+    branches: [master]
+    paths:
+      - "midi-experiments/**"
+      - ".github/workflows/midi-experiments-build.yml"
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/compile-sketches@v1
+        with:
+          fqbn: esp32:esp32:esp32c3
+          sketch-paths: |
+            - midi-experiments/ble_midi_knob
+          platforms: |
+            - name: esp32:esp32
+              version: 3.3.12
+              source-url: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          # NimBLE is pinned to 1.4.3 because BLE-MIDI is not compatible with 2.x.
+          libraries: |
+            - name: NimBLE-Arduino
+              version: 1.4.3
+            - name: BLE-MIDI
+              version: 2.2
+            - name: Modulino
