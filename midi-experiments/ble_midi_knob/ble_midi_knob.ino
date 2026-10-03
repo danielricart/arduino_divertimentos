@@ -11,7 +11,7 @@
 
   Libraries (Library Manager):
     - BLE-MIDI           (lathoub)   -> pulls in MIDI Library (FortySevenEffects)
-    - NimBLE-Arduino     (h2zero)
+    - NimBLE-Arduino     (h2zero) version 1.4.3 (BLE-MIDI is not compatible with 2.x)
     - Modulino           (Arduino)   -> Arduino_Modulino
 */
 
