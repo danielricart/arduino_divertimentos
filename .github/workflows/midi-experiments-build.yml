@@ -18,7 +18,7 @@ jobs:
 
       - uses: arduino/compile-sketches@v1
         with:
-          fqbn: esp32:esp32:esp32c3
+          fqbn: esp32:esp32:nologo_esp32c3_super_mini
           sketch-paths: |
             - midi-experiments/ble_midi_knob
           platforms: |
