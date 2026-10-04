@@ -5,7 +5,8 @@
 ESP32-C3 acting as a standard BLE MIDI device (no drivers needed on Windows 10/11 or macOS).
 
 - Modulino Knob -> CC 1, channel 1 (value 0-127, clamped)
-- Modulino Buttons, button A -> note 60 on/off; hold 3 s to disconnect, clear bonds and re-advertise
+- Modulino Buttons (3 buttons A, B, C) -> notes 60, 62, 64, on while held and off on release
+- Hold button C for 5 s to disconnect, clear bonds and re-advertise (pair with a different computer)
 
 ### Wiring (ESP32-C3 Super Mini, 3.3 V only)
 

@@ -1,9 +1,9 @@
 /*
   ESP32-C3 BLE MIDI controller
   - Modulino Knob  -> MIDI Control Change (CC 1, channel 1 by default)
-  - Modulino Buttons:
-      button A short press -> MIDI note 60 on/off
-      button A long press  -> disconnect, clear stored bonds, restart advertising
+  - Modulino Buttons (3 buttons, labelled A, B, C):
+      short press A/B/C    -> MIDI notes 60/62/64 on while held, off on release
+      button C held 5 s    -> disconnect, clear stored bonds, restart advertising
                               (use this to pair with a different computer)
 
   Uses the standard BLE MIDI GATT service, so Windows 10/11 and macOS
@@ -28,11 +28,12 @@ const uint8_t BUTTONS_ADDRESS = 0x7C;
 const char*   DEVICE_NAME     = "ESP32-C3 MIDI Knob";
 const uint8_t MIDI_CHANNEL    = 1;
 const uint8_t KNOB_CC         = 1;     // CC number sent by the knob
-const uint8_t BUTTON_NOTE     = 60;
+const uint8_t BUTTON_NOTES[3] = {60, 62, 64};   // buttons A, B, C
 const uint8_t BUTTON_VELOCITY = 100;
 
 const int     KNOB_STEP       = 2;     // CC change per encoder detent
-const uint32_t LONG_PRESS_MS  = 3000;  // hold button A this long to re-pair
+const uint8_t  REPAIR_BUTTON  = 2;     // 0 = A, 1 = B, 2 = C
+const uint32_t LONG_PRESS_MS  = 5000;  // hold the re-pair button this long to re-pair
 const uint32_t POLL_MS        = 10;
 // -----------------------------------
 
@@ -44,9 +45,10 @@ ModulinoButtons buttons(BUTTONS_ADDRESS);
 bool connected = false;
 int  lastCC    = -1;
 
-bool     buttonDown  = false;
+const uint8_t NUM_BUTTONS = 3;
+bool     buttonDown[NUM_BUTTONS]  = {false, false, false};
+uint32_t buttonSince[NUM_BUTTONS] = {0, 0, 0};
 bool     longHandled = false;
-uint32_t buttonSince = 0;
 
 void sendKnobValue(int cc) {
   if (cc != lastCC && connected) {
@@ -55,7 +57,14 @@ void sendKnobValue(int cc) {
   }
 }
 
+void releaseAllNotes() {
+  for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
+    if (buttonDown[i] && connected) MIDI.sendNoteOff(BUTTON_NOTES[i], 0, MIDI_CHANNEL);
+  }
+}
+
 void clearPairing() {
+  releaseAllNotes();         // avoid a stuck note on the host when the link drops
   Serial.println("Clearing bonds and restarting advertising");
   NimBLEServer* server = NimBLEDevice::getServer();
   if (server) {
@@ -106,20 +115,25 @@ void loop() {
     sendKnobValue(min(count * KNOB_STEP, 127));
   }
 
-  // Button A: short press = note, long press = re-pair
+  // Buttons A/B/C: each sends its own note while held; holding the re-pair button re-pairs
   if (buttons.update()) {
-    bool down = buttons.isPressed('A');
-    if (down && !buttonDown) {
-      buttonDown = true;
-      longHandled = false;
-      buttonSince = millis();
-      if (connected) MIDI.sendNoteOn(BUTTON_NOTE, BUTTON_VELOCITY, MIDI_CHANNEL);
-    } else if (!down && buttonDown) {
-      buttonDown = false;
-      if (connected) MIDI.sendNoteOff(BUTTON_NOTE, 0, MIDI_CHANNEL);
+    for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
+      bool down = buttons.isPressed((int)i);
+      if (down && !buttonDown[i]) {
+        buttonDown[i] = true;
+        if (i == REPAIR_BUTTON) {
+          buttonSince[i] = millis();
+          longHandled = false;
+        }
+        if (connected) MIDI.sendNoteOn(BUTTON_NOTES[i], BUTTON_VELOCITY, MIDI_CHANNEL);
+      } else if (!down && buttonDown[i]) {
+        buttonDown[i] = false;
+        if (connected) MIDI.sendNoteOff(BUTTON_NOTES[i], 0, MIDI_CHANNEL);
+      }
     }
   }
-  if (buttonDown && !longHandled && millis() - buttonSince >= LONG_PRESS_MS) {
+  if (buttonDown[REPAIR_BUTTON] && !longHandled &&
+      millis() - buttonSince[REPAIR_BUTTON] >= LONG_PRESS_MS) {
     longHandled = true;
     clearPairing();
   }
