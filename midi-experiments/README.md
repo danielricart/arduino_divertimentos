@@ -7,7 +7,7 @@ ESP32-C3 acting as a standard BLE MIDI device (no drivers needed on Windows 10/1
 - Modulino Knob -> CC 1, channel 1 (value 0-127, clamped)
 - Modulino Buttons (3 buttons A, B, C) -> notes 60, 62, 64, on while held and off on release
 - Modulino Pixels (8 RGB LEDs) controlled from the computer on channel 1: CC 20-27 = brightness of LED 1-8, CC 28 = master brightness, CC 29/30/31 = red/green/blue. LEDs start off until a brightness is sent. The Knob stays on CC 1.
-- Hold button C for 5 s to disconnect, clear bonds and re-advertise (pair with a different computer)
+- Hold button C for 5 s to disconnect and clear Bluetooth pairing, so the device can pair with a different computer
 
 ### MIDI map (channel 1)
 
@@ -20,7 +20,7 @@ ESP32-C3 acting as a standard BLE MIDI device (no drivers needed on Windows 10/1
 | Button A | Out | Note 60 (C4), velocity 100 | on while held / off on release |
 | Button B | Out | Note 62 (D4), velocity 100 | on while held / off on release |
 | Button C | Out | Note 64 (E4), velocity 100 | on while held / off on release |
-| Button C held 5 s | - | none (disconnects and clears bonds) | - |
+| Button C held 5 s | - | none (disconnect and clears Bluetooth pairing) | - |
 | Brightness - LED0 | In | CC 20 | 0-127 |
 | Brightness - LED1 | In | CC 21 | 0-127 |
 | Brightness - LED2 | In | CC 22 | 0-127 |
@@ -82,7 +82,8 @@ To update later: `git -C ~/Documents/Arduino/libraries/BLE-MIDI pull`.
 
 ### Setup
 1. Board: **ESP32C3 SuperMini** (`nologo_esp32c3_super_mini`). Enable **USB CDC On Boot** to see Serial output.
-2. Set `KNOB_ADDRESS` / `BUTTONS_ADDRESS` / `PIXELS_ADDRESS` in the sketch.
+2. I2C addresses in the sketch: Knob `0x3A` (`0x3B` with the alternate pinstrap), Buttons `0x3E`, Pixels `0x36`.
+   Use `0xFF` to let the library find a module, or run the Modulino `AddressChanger` example to list them.
 3. Upload, then pair:
    - macOS: Audio MIDI Setup -> Window -> Show MIDI Studio -> Bluetooth icon -> Connect.
      The device does not appear in System Settings -> Bluetooth.

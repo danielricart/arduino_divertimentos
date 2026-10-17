@@ -3,7 +3,7 @@
   - Modulino Knob  -> MIDI Control Change (CC 1, channel 1 by default)
   - Modulino Buttons (3 buttons, labelled A, B, C):
       short press A/B/C    -> MIDI notes 60/62/64 on while held, off on release
-      button C held 5 s    -> disconnect, clear stored bonds, restart advertising
+      button C held 5 s    -> disconnect and clear Bluetooth pairing, restart advertising
                               (use this to pair with a different computer)
 
   - Modulino Pixels (8 RGB LEDs), controlled from the computer over MIDI (channel 1):
@@ -32,11 +32,12 @@
 #endif
 
 // ---------- Configuration ----------
-// Defaults from the Arduino_Modulino library. The Knob here uses 0x74 (0x76 is the alternate pinstrap).
-// Pass 0xFF to let the library auto-discover the module instead.
-const uint8_t KNOB_ADDRESS    = 0x74;
-const uint8_t BUTTONS_ADDRESS = 0x7C;
-const uint8_t PIXELS_ADDRESS  = 0x6C;
+// 7-bit I2C addresses as used on the bus (the library's internal "pinstrap" table stores
+// them doubled: 0x74/0x76, 0x7C, 0x6C). Knob is 0x3B with the alternate pinstrap.
+// Pass 0xFF to let the library auto-discover a module instead.
+const uint8_t KNOB_ADDRESS    = 0x3A;
+const uint8_t BUTTONS_ADDRESS = 0x3E;
+const uint8_t PIXELS_ADDRESS  = 0x36;
 
 const char*   DEVICE_NAME     = "ESP32-C3 MIDI Knob";
 const uint8_t MIDI_CHANNEL    = 1;
@@ -143,7 +144,7 @@ void deleteAllBonds() {
 
 void clearPairing() {
   releaseAllNotes();         // avoid a stuck note on the host when the link drops
-  Serial.println("Clearing bonds and restarting advertising");
+  Serial.println("Disconnecting and clearing Bluetooth pairing");
   BLEServer* server = BLEDevice::getServer();
   if (server) {
     for (auto& peer : server->getPeerDevices(false)) {
