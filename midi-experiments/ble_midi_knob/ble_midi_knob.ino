@@ -3,8 +3,8 @@
   - Modulino Knob  -> MIDI Control Change (CC 1, channel 1 by default)
   - Modulino Buttons (3 buttons, labelled A, B, C):
       short press A/B/C    -> MIDI notes 60/62/64 on while held, off on release
-      button C held 5 s    -> disconnect and clear Bluetooth pairing, restart advertising
-                              (use this to pair with a different computer)
+      button C held 5 s    -> disconnect from the computer and advertise again
+                              (pairing is kept, so the same or another computer can connect)
 
   - Modulino Pixels (8 RGB LEDs), controlled from the computer over MIDI (channel 1):
       CC 20-27  brightness of LED 1-8 (0-127)
@@ -24,12 +24,6 @@
 #include <BLEMIDI_Transport.h>
 #include <hardware/BLEMIDI_ESP32.h>
 
-// Stack-specific headers, only needed to clear stored bonds
-#if defined(CONFIG_NIMBLE_ENABLED)
-#include <host/ble_hs.h>
-#elif defined(CONFIG_BLUEDROID_ENABLED)
-#include <esp_gap_ble_api.h>
-#endif
 
 // ---------- Configuration ----------
 // 7-bit I2C addresses as used on the bus (the library's internal "pinstrap" table stores
@@ -54,8 +48,8 @@ const uint8_t PIXEL_CC_BLUE   = 31;
 const uint8_t NUM_PIXELS      = 8;
 
 const int     KNOB_STEP       = 2;     // CC change per encoder detent
-const uint8_t  REPAIR_BUTTON  = 2;     // 0 = A, 1 = B, 2 = C
-const uint32_t LONG_PRESS_MS  = 5000;  // hold the re-pair button this long to re-pair
+const uint8_t  DISCONNECT_BUTTON = 2;  // 0 = A, 1 = B, 2 = C
+const uint32_t LONG_PRESS_MS  = 5000;  // hold the disconnect button this long to disconnect
 const uint32_t POLL_MS        = 10;
 // -----------------------------------
 
@@ -128,31 +122,18 @@ void releaseAllNotes() {
   }
 }
 
-void deleteAllBonds() {
-#if defined(CONFIG_NIMBLE_ENABLED)
-  ble_store_clear();
-#elif defined(CONFIG_BLUEDROID_ENABLED)
-  int count = esp_ble_get_bond_device_num();
-  if (count > 0) {
-    esp_ble_bond_dev_t* list = new esp_ble_bond_dev_t[count];
-    esp_ble_get_bond_device_list(&count, list);
-    for (int i = 0; i < count; i++) esp_ble_remove_bond_device(list[i].bd_addr);
-    delete[] list;
-  }
-#endif
-}
-
-void clearPairing() {
+// Drops the current connection but keeps the pairing keys: clearing them made the Mac,
+// which still holds its copy, unable to reconnect. Advertising restarts from the
+// disconnected handler, so this or another computer can connect again.
+void disconnectHost() {
   releaseAllNotes();         // avoid a stuck note on the host when the link drops
-  Serial.println("Disconnecting and clearing Bluetooth pairing");
+  Serial.println("Disconnecting from the computer");
   BLEServer* server = BLEDevice::getServer();
   if (server) {
     for (auto& peer : server->getPeerDevices(false)) {
       server->disconnect(peer.first);
     }
   }
-  deleteAllBonds();
-  // Advertising restarts from the disconnected handler once the link is down
 }
 
 void setup() {
@@ -202,13 +183,13 @@ void loop() {
     sendKnobValue(min(count * KNOB_STEP, 127));
   }
 
-  // Buttons A/B/C: each sends its own note while held; holding the re-pair button re-pairs
+  // Buttons A/B/C: each sends its own note while held; holding the disconnect button disconnects
   if (buttons.update()) {
     for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
       bool down = buttons.isPressed((int)i);
       if (down && !buttonDown[i]) {
         buttonDown[i] = true;
-        if (i == REPAIR_BUTTON) {
+        if (i == DISCONNECT_BUTTON) {
           buttonSince[i] = millis();
           longHandled = false;
         }
@@ -219,9 +200,9 @@ void loop() {
       }
     }
   }
-  if (buttonDown[REPAIR_BUTTON] && !longHandled &&
-      millis() - buttonSince[REPAIR_BUTTON] >= LONG_PRESS_MS) {
+  if (buttonDown[DISCONNECT_BUTTON] && !longHandled &&
+      millis() - buttonSince[DISCONNECT_BUTTON] >= LONG_PRESS_MS) {
     longHandled = true;
-    clearPairing();
+    disconnectHost();
   }
 }
