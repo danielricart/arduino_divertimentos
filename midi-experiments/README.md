@@ -27,19 +27,37 @@ Notes:
 - GPIO8 and GPIO9 are boot-strapping pins (GPIO9 is the BOOT button). If the board will not boot or enter
   download mode with the modules attached, disconnect them and retry.
 
-### Setup
-1. Install the esp32 board core (Espressif) and select **ESP32C3 SuperMini** (`nologo_esp32c3_super_mini`).
-2. Library Manager: `BLE-MIDI` (lathoub), `NimBLE-Arduino` (h2zero) **version 1.4.3** (latest 1.x; do not use 2.x, see below), `Arduino_Modulino` (Arduino).
-3. Set `KNOB_ADDRESS` / `BUTTONS_ADDRESS` in the sketch. The modules must already be configured to
-   those I2C addresses. Library defaults are Knob 0x74 (0x76 alternate) and Buttons 0x7C; use 0xFF to auto-discover.
-4. Upload, then pair:
-   - macOS: Audio MIDI Setup -> Window -> Show MIDI Studio -> Bluetooth icon -> Connect.
-   - Windows: use a BLE MIDI-aware app (e.g. a DAW or MIDI-OX alternative such as Bluetooth LE MIDI
-     support in recent Windows MIDI Services); some apps need the device added under Bluetooth settings first.
+### Libraries
 
-### Compatibility warning
-BLE-MIDI 2.2 (lathoub) implements NimBLE server callbacks with the 1.x signatures (`onConnect(BLEServer*)`). NimBLE-Arduino 2.x changed them, so this project pins NimBLE-Arduino 1.4.3 (the latest 1.4.x) until BLE-MIDI is updated.
+| Library | Source | Install |
+|---------|--------|---------|
+| esp32 board core (Espressif) | Boards Manager | Install `esp32` by Espressif Systems, latest 3.x |
+| BLE-MIDI (lathoub) | **GitHub master** | `git clone https://github.com/lathoub/Arduino-BLE-MIDI.git ~/Documents/Arduino/libraries/BLE-MIDI` |
+| MIDI Library (FortySevenEffects) | Library Manager | Search `MIDI Library` |
+| Arduino_Modulino (Arduino) | Library Manager | Search `Arduino_Modulino` (accept its dependencies) |
+
+Not needed: **NimBLE-Arduino**. BLE uses the core's built-in BLE library.
+
+Why GitHub for BLE-MIDI: the Library Manager release (2.2, 2022) does not compile on esp32 core 3.x
+(`conversion from 'String' to non-scalar type 'std::string'`). Master has the fix.
+Without git: download https://github.com/lathoub/Arduino-BLE-MIDI/archive/refs/heads/master.zip,
+unzip, and rename the folder to `~/Documents/Arduino/libraries/BLE-MIDI`.
+To update later: `git -C ~/Documents/Arduino/libraries/BLE-MIDI pull`.
+
+### Clean up an older setup
+1. Close the Arduino IDE.
+2. Delete `~/Documents/Arduino/libraries/BLE-MIDI` (the Library Manager 2.2 copy).
+3. Delete `~/Documents/Arduino/libraries/NimBLE-Arduino`.
+4. Install BLE-MIDI from GitHub as above, then reopen the IDE.
+5. If the IDE offers to install NimBLE-Arduino or "update" BLE-MIDI, decline.
+
+### Setup
+1. Board: **ESP32C3 SuperMini** (`nologo_esp32c3_super_mini`). Enable **USB CDC On Boot** to see Serial output.
+2. Set `KNOB_ADDRESS` / `BUTTONS_ADDRESS` in the sketch.
+3. Upload, then pair:
+   - macOS: Audio MIDI Setup -> Window -> Show MIDI Studio -> Bluetooth icon -> Connect.
+     The device does not appear in System Settings -> Bluetooth.
+   - Windows: use a BLE MIDI-aware app; some need the device added under Bluetooth settings first.
 
 ### Status
-Not compiled or tested on hardware (no toolchain in the authoring environment). Library API names
-(`setHandleConnected`, `ModulinoKnob(address)`, `getPeerDevices`) should be verified against the versions you install.
+CI compiles the sketch on every push. Not yet verified on hardware with the core BLE transport.
