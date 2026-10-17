@@ -9,6 +9,34 @@ ESP32-C3 acting as a standard BLE MIDI device (no drivers needed on Windows 10/1
 - Modulino Pixels (8 RGB LEDs) controlled from the computer on channel 1: CC 20-27 = brightness of LED 1-8, CC 28 = master brightness, CC 29/30/31 = red/green/blue. LEDs start off until a brightness is sent. The Knob stays on CC 1.
 - Hold button C for 5 s to disconnect, clear bonds and re-advertise (pair with a different computer)
 
+### MIDI map (channel 1)
+
+"Out" = sent by the device to the computer. "In" = sent by the computer to the device.
+
+| Function | Direction | MIDI message | Range |
+|----------|-----------|--------------|-------|
+| Knob rotation | Out | CC 1 | 0-127 |
+| Knob press | - | not mapped | - |
+| Button A | Out | Note 60 (C4), velocity 100 | on while held / off on release |
+| Button B | Out | Note 62 (D4), velocity 100 | on while held / off on release |
+| Button C | Out | Note 64 (E4), velocity 100 | on while held / off on release |
+| Button C held 5 s | - | none (disconnects and clears bonds) | - |
+| Brightness - LED0 | In | CC 20 | 0-127 |
+| Brightness - LED1 | In | CC 21 | 0-127 |
+| Brightness - LED2 | In | CC 22 | 0-127 |
+| Brightness - LED3 | In | CC 23 | 0-127 |
+| Brightness - LED4 | In | CC 24 | 0-127 |
+| Brightness - LED5 | In | CC 25 | 0-127 |
+| Brightness - LED6 | In | CC 26 | 0-127 |
+| Brightness - LED7 | In | CC 27 | 0-127 |
+| Master brightness (all LEDs) | In | CC 28 | 0-127 (multiplies each LED's value) |
+| Colour red (all LEDs) | In | CC 29 | 0-127 |
+| Colour green (all LEDs) | In | CC 30 | 0-127 |
+| Colour blue (all LEDs) | In | CC 31 | 0-127 |
+
+At start-up all LEDs are off, master brightness is 127 and the colour is white (127/127/127),
+so sending CC 20 = 127 alone lights LED0 white.
+
 ### Wiring (ESP32-C3 Super Mini, 3.3 V only)
 
 The Modulinos run at **3.3 V** (supply range 2.0-3.6 V) with 3.3 V I2C logic. Never power them from 5 V.
