@@ -7,7 +7,7 @@ ESP32-C3 acting as a standard BLE MIDI device (no drivers needed on Windows 10/1
 - Modulino Knob -> CC 1, channel 1 (value 0-127, clamped)
 - Modulino Buttons (3 buttons A, B, C) -> notes 60, 62, 64, on while held and off on release
 - Modulino Pixels (8 RGB LEDs) controlled from the computer on channel 1: CC 20-27 = brightness of LED 1-8, CC 28 = master brightness, CC 29/30/31 = red/green/blue. LEDs start off until a brightness is sent. The Knob stays on CC 1.
-- Hold button C for 5 s to disconnect and clear Bluetooth pairing, so the device can pair with a different computer
+- Hold button C for 5 s to disconnect from the computer. Pairing is kept, so the same computer can reconnect and another computer can connect while the device advertises
 
 ### MIDI map (channel 1)
 
@@ -20,7 +20,7 @@ ESP32-C3 acting as a standard BLE MIDI device (no drivers needed on Windows 10/1
 | Button A | Out | Note 60 (C4), velocity 100 | on while held / off on release |
 | Button B | Out | Note 62 (D4), velocity 100 | on while held / off on release |
 | Button C | Out | Note 64 (E4), velocity 100 | on while held / off on release |
-| Button C held 5 s | - | none (disconnect and clears Bluetooth pairing) | - |
+| Button C held 5 s | - | none (disconnects from the computer, keeps pairing) | - |
 | Brightness - LED0 | In | CC 20 | 0-127 |
 | Brightness - LED1 | In | CC 21 | 0-127 |
 | Brightness - LED2 | In | CC 22 | 0-127 |
@@ -88,8 +88,11 @@ To update later: `git -C ~/Documents/Arduino/libraries/BLE-MIDI pull`.
    - macOS: Audio MIDI Setup -> Window -> Show MIDI Studio -> Bluetooth icon -> Connect.
      The device does not appear in System Settings -> Bluetooth.
    - Windows: use a BLE MIDI-aware app; some need the device added under Bluetooth settings first.
+4. If the Mac cannot reconnect after a board was reflashed or ran an older build that cleared its pairing,
+   make the Mac forget it (System Settings -> Bluetooth -> (i) next to the device -> Forget This Device),
+   then connect again from Audio MIDI Setup.
 
 ### Status
 CI compiles the sketch on every push.
 Verified on an ESP32-C3 Super Mini with macOS: BLE pairing via Audio MIDI Setup, knob CC 1, button notes,
-and LED0 via CC 20. Not yet verified: the 5 s re-pair hold on C, the other LED CCs and the colour CCs.
+and LED0 via CC 20. Not yet verified: the 5 s disconnect hold on C, the other LED CCs and the colour CCs.
