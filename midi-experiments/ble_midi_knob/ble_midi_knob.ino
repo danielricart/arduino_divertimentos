@@ -23,6 +23,7 @@
 #include <Arduino_Modulino.h>
 #include <BLEMIDI_Transport.h>
 #include <hardware/BLEMIDI_ESP32.h>
+#include <esp_mac.h>
 
 
 // ---------- Configuration ----------
@@ -33,7 +34,7 @@ const uint8_t KNOB_ADDRESS    = 0x3A;
 const uint8_t BUTTONS_ADDRESS = 0x3E;
 const uint8_t PIXELS_ADDRESS  = 0x36;
 
-const char*   DEVICE_NAME     = "ESP32-C3 MIDI Knob";
+const char*   DEVICE_NAME     = "ESP32-C3 MIDI Knob";  // the last 4 hex digits of the Bluetooth MAC are appended
 const uint8_t MIDI_CHANNEL    = 1;
 const uint8_t KNOB_CC         = 1;     // CC number sent by the knob
 const uint8_t BUTTON_NOTES[3] = {60, 62, 64};   // buttons A, B, C
@@ -161,6 +162,16 @@ void setup() {
   });
 
   MIDI.setHandleControlChange(onControlChange);
+  // Make each board distinguishable: append the last two bytes of its factory Bluetooth MAC.
+  // The name must fit BLE-MIDI's 24-byte buffer (23 characters).
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_BT);
+  static char bleName[24];
+  snprintf(bleName, sizeof(bleName), "%s %02X%02X", DEVICE_NAME, mac[4], mac[5]);
+  BLEMIDI.setName(bleName);
+  Serial.printf("Bluetooth name \"%s\", MAC %02X:%02X:%02X:%02X:%02X:%02X\n",
+                bleName, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
   MIDI.begin();
   Serial.println("Advertising as BLE MIDI device");
 }

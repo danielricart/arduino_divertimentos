@@ -4,6 +4,9 @@
 
 ESP32-C3 acting as a standard BLE MIDI device (no drivers needed on Windows 10/11 or macOS).
 
+Each board advertises as `ESP32-C3 MIDI Knob XXXX`, where `XXXX` are the last 4 hex digits of its
+factory Bluetooth MAC, so several boards can be told apart. Serial prints the full name and MAC at start-up.
+
 - Modulino Knob -> CC 1, channel 1 (value 0-127, clamped)
 - Modulino Buttons (3 buttons A, B, C) -> notes 60, 62, 64, on while held and off on release
 - Modulino Pixels (8 RGB LEDs) controlled from the computer on channel 1: CC 20-27 = brightness of LED 1-8, CC 28 = master brightness, CC 29/30/31 = red/green/blue. LEDs start off until a brightness is sent. The Knob stays on CC 1.
