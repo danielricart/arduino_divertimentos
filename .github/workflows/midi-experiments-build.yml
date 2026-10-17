@@ -23,14 +23,10 @@ jobs:
             - midi-experiments/ble_midi_knob
           platforms: |
             - name: esp32:esp32
-              version: "3.3.12"
               source-url: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-          # NimBLE must be pinned to 1.4.3 because BLE-MIDI is not compatible with 2.x.
-          # It is installed last because installing BLE-MIDI pulls the newest NimBLE as a
-          # dependency and would otherwise replace the pin.
+          # BLE-MIDI comes from GitHub master: the 2.2 release does not compile on esp32 core 3.x.
           libraries: |
-            - name: BLE-MIDI
-              version: "2.2"
+            - source-url: https://github.com/lathoub/Arduino-BLE-MIDI.git
+              name: BLE-MIDI
+            - name: MIDI Library
             - name: Arduino_Modulino
-            - name: NimBLE-Arduino
-              version: "1.4.3"

@@ -9,15 +9,21 @@
   Uses the standard BLE MIDI GATT service, so Windows 10/11 and macOS
   need no extra drivers.
 
-  Libraries (Library Manager):
-    - BLE-MIDI           (lathoub)   -> pulls in MIDI Library (FortySevenEffects)
-    - NimBLE-Arduino     (h2zero) version 1.4.3 (BLE-MIDI is not compatible with 2.x)
-    - Modulino           (Arduino)   -> Arduino_Modulino
+  Libraries: see midi-experiments/README.md. BLE-MIDI must come from its GitHub
+  master; the 2.2 release in Library Manager does not compile on esp32 core 3.x.
+  BLE uses the esp32 core's built-in BLE library (no NimBLE-Arduino).
 */
 
 #include <Arduino_Modulino.h>
 #include <BLEMIDI_Transport.h>
-#include <hardware/BLEMIDI_ESP32_NimBLE.h>
+#include <hardware/BLEMIDI_ESP32.h>
+
+// Stack-specific headers, only needed to clear stored bonds
+#if defined(CONFIG_NIMBLE_ENABLED)
+#include <host/ble_hs.h>
+#elif defined(CONFIG_BLUEDROID_ENABLED)
+#include <esp_gap_ble_api.h>
+#endif
 
 // ---------- Configuration ----------
 // Defaults from the Arduino_Modulino library. The Knob here uses 0x74 (0x76 is the alternate pinstrap).
@@ -55,16 +61,30 @@ void sendKnobValue(int cc) {
   }
 }
 
+void deleteAllBonds() {
+#if defined(CONFIG_NIMBLE_ENABLED)
+  ble_store_clear();
+#elif defined(CONFIG_BLUEDROID_ENABLED)
+  int count = esp_ble_get_bond_device_num();
+  if (count > 0) {
+    esp_ble_bond_dev_t* list = new esp_ble_bond_dev_t[count];
+    esp_ble_get_bond_device_list(&count, list);
+    for (int i = 0; i < count; i++) esp_ble_remove_bond_device(list[i].bd_addr);
+    delete[] list;
+  }
+#endif
+}
+
 void clearPairing() {
   Serial.println("Clearing bonds and restarting advertising");
-  NimBLEServer* server = NimBLEDevice::getServer();
+  BLEServer* server = BLEDevice::getServer();
   if (server) {
-    for (uint16_t handle : server->getPeerDevices()) {
-      server->disconnect(handle);
+    for (auto& peer : server->getPeerDevices(false)) {
+      server->disconnect(peer.first);
     }
   }
-  NimBLEDevice::deleteAllBonds();
-  NimBLEDevice::startAdvertising();
+  deleteAllBonds();
+  // Advertising restarts from the disconnected handler once the link is down
 }
 
 void setup() {
@@ -84,6 +104,8 @@ void setup() {
   BLEMIDI.setHandleDisconnected([]() {
     connected = false;
     Serial.println("BLE MIDI disconnected");
+    // The core BLE transport does not re-advertise by itself after a disconnect
+    BLEDevice::startAdvertising();
   });
 
   MIDI.begin();
