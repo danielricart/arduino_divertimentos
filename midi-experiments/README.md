@@ -90,4 +90,6 @@ To update later: `git -C ~/Documents/Arduino/libraries/BLE-MIDI pull`.
    - Windows: use a BLE MIDI-aware app; some need the device added under Bluetooth settings first.
 
 ### Status
-CI compiles the sketch on every push. Not yet verified on hardware with the core BLE transport.
+CI compiles the sketch on every push.
+Verified on an ESP32-C3 Super Mini with macOS: BLE pairing via Audio MIDI Setup, knob CC 1, button notes,
+and LED0 via CC 20. Not yet verified: the 5 s re-pair hold on C, the other LED CCs and the colour CCs.
