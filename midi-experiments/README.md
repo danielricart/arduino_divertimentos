@@ -5,15 +5,44 @@
 ESP32-C3 acting as a standard BLE MIDI device (no drivers needed on Windows 10/11 or macOS).
 
 - Modulino Knob -> CC 1, channel 1 (value 0-127, clamped)
-- Modulino Buttons, button A -> note 60 on/off; hold 3 s to disconnect, clear bonds and re-advertise
+- Modulino Buttons (3 buttons A, B, C) -> notes 60, 62, 64, on while held and off on release
+- Modulino Pixels (8 RGB LEDs) controlled from the computer on channel 1: CC 20-27 = brightness of LED 1-8, CC 28 = master brightness, CC 29/30/31 = red/green/blue. LEDs start off until a brightness is sent. The Knob stays on CC 1.
+- Hold button C for 5 s to disconnect and clear Bluetooth pairing, so the device can pair with a different computer
+
+### MIDI map (channel 1)
+
+"Out" = sent by the device to the computer. "In" = sent by the computer to the device.
+
+| Function | Direction | MIDI message | Range |
+|----------|-----------|--------------|-------|
+| Knob rotation | Out | CC 1 | 0-127 |
+| Knob press | - | not mapped | - |
+| Button A | Out | Note 60 (C4), velocity 100 | on while held / off on release |
+| Button B | Out | Note 62 (D4), velocity 100 | on while held / off on release |
+| Button C | Out | Note 64 (E4), velocity 100 | on while held / off on release |
+| Button C held 5 s | - | none (disconnect and clears Bluetooth pairing) | - |
+| Brightness - LED0 | In | CC 20 | 0-127 |
+| Brightness - LED1 | In | CC 21 | 0-127 |
+| Brightness - LED2 | In | CC 22 | 0-127 |
+| Brightness - LED3 | In | CC 23 | 0-127 |
+| Brightness - LED4 | In | CC 24 | 0-127 |
+| Brightness - LED5 | In | CC 25 | 0-127 |
+| Brightness - LED6 | In | CC 26 | 0-127 |
+| Brightness - LED7 | In | CC 27 | 0-127 |
+| Master brightness (all LEDs) | In | CC 28 | 0-127 (multiplies each LED's value) |
+| Colour red (all LEDs) | In | CC 29 | 0-127 |
+| Colour green (all LEDs) | In | CC 30 | 0-127 |
+| Colour blue (all LEDs) | In | CC 31 | 0-127 |
+
+At start-up all LEDs are off, master brightness is 127 and the colour is white (127/127/127),
+so sending CC 20 = 127 alone lights LED0 white.
 
 ### Wiring (ESP32-C3 Super Mini, 3.3 V only)
 
 The Modulinos run at **3.3 V** (supply range 2.0-3.6 V) with 3.3 V I2C logic. Never power them from 5 V.
 The Super Mini's default I2C pins are GPIO8 (SDA) and GPIO9 (SCL), which is what the sketch uses.
 
-Qwiic cable colours are black, red, blue, yellow. Each module has two Qwiic connectors, so chain the second
-module from the first, or join both to the same four wires:
+Qwiic cable colours are black, red, blue, yellow. Each module has two Qwiic connectors, so chain the Buttons and Pixels from the Knob (or join all of them to the same four wires):
 
 | Qwiic wire | Signal | Super Mini pin |
 |------------|--------|----------------|
@@ -53,11 +82,14 @@ To update later: `git -C ~/Documents/Arduino/libraries/BLE-MIDI pull`.
 
 ### Setup
 1. Board: **ESP32C3 SuperMini** (`nologo_esp32c3_super_mini`). Enable **USB CDC On Boot** to see Serial output.
-2. Set `KNOB_ADDRESS` / `BUTTONS_ADDRESS` in the sketch.
+2. I2C addresses in the sketch: Knob `0x3A` (`0x3B` with the alternate pinstrap), Buttons `0x3E`, Pixels `0x36`.
+   Use `0xFF` to let the library find a module, or run the Modulino `AddressChanger` example to list them.
 3. Upload, then pair:
    - macOS: Audio MIDI Setup -> Window -> Show MIDI Studio -> Bluetooth icon -> Connect.
      The device does not appear in System Settings -> Bluetooth.
    - Windows: use a BLE MIDI-aware app; some need the device added under Bluetooth settings first.
 
 ### Status
-CI compiles the sketch on every push. Not yet verified on hardware with the core BLE transport.
+CI compiles the sketch on every push.
+Verified on an ESP32-C3 Super Mini with macOS: BLE pairing via Audio MIDI Setup, knob CC 1, button notes,
+and LED0 via CC 20. Not yet verified: the 5 s re-pair hold on C, the other LED CCs and the colour CCs.
