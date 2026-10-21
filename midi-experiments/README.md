@@ -10,6 +10,7 @@ factory Bluetooth MAC, so several boards can be told apart. Serial prints the fu
 - Modulino Knob -> CC 1, channel 1 (value 0-127, clamped)
 - Modulino Buttons (3 buttons A, B, C) -> notes 60, 62, 64, on while held and off on release
 - Modulino Pixels (8 RGB LEDs) controlled from the computer on channel 1: CC 20-27 = brightness of LED 1-8, CC 28 = master brightness, CC 29/30/31 = red/green/blue. LEDs start off until a brightness is sent. The Knob stays on CC 1.
+- Modulino Movement: gyroscope rotation speed -> CC 102/103/104 (roll/pitch/yaw), 64 when still. Tune range, dead zone and smoothing with the `GYRO_*` constants in the sketch.
 - Hold button C for 5 s to disconnect from the computer. Pairing is kept, so the same computer can reconnect and another computer can connect while the device advertises
 
 ### MIDI map (channel 1)
@@ -24,6 +25,9 @@ factory Bluetooth MAC, so several boards can be told apart. Serial prints the fu
 | Button B | Out | Note 62 (D4), velocity 100 | on while held / off on release |
 | Button C | Out | Note 64 (E4), velocity 100 | on while held / off on release |
 | Button C held 5 s | - | none (disconnects from the computer, keeps pairing) | - |
+| Gyro roll speed | Out | CC 102 | 0-127, 64 when still |
+| Gyro pitch speed | Out | CC 103 | 0-127, 64 when still |
+| Gyro yaw speed | Out | CC 104 | 0-127, 64 when still |
 | Brightness - LED0 | In | CC 20 | 0-127 |
 | Brightness - LED1 | In | CC 21 | 0-127 |
 | Brightness - LED2 | In | CC 22 | 0-127 |
@@ -45,7 +49,7 @@ so sending CC 20 = 127 alone lights LED0 white.
 The Modulinos run at **3.3 V** (supply range 2.0-3.6 V) with 3.3 V I2C logic. Never power them from 5 V.
 The Super Mini's default I2C pins are GPIO8 (SDA) and GPIO9 (SCL), which is what the sketch uses.
 
-Qwiic cable colours are black, red, blue, yellow. Each module has two Qwiic connectors, so chain the Buttons and Pixels from the Knob (or join all of them to the same four wires):
+Qwiic cable colours are black, red, blue, yellow. Each module has two Qwiic connectors, so chain the Buttons, Pixels and Movement from the Knob (or join all of them to the same four wires):
 
 | Qwiic wire | Signal | Super Mini pin |
 |------------|--------|----------------|
@@ -85,7 +89,7 @@ To update later: `git -C ~/Documents/Arduino/libraries/BLE-MIDI pull`.
 
 ### Setup
 1. Board: **ESP32C3 SuperMini** (`nologo_esp32c3_super_mini`). Enable **USB CDC On Boot** to see Serial output.
-2. I2C addresses in the sketch: Knob `0x3A` (`0x3B` with the alternate pinstrap), Buttons `0x3E`, Pixels `0x36`.
+2. I2C addresses in the sketch: Knob `0x3A` (`0x3B` with the alternate pinstrap), Buttons `0x3E`, Pixels `0x36`, Movement `0x6A` (`0x6B` on some modules).
    Use `0xFF` to let the library find a module, or run the Modulino `AddressChanger` example to list them.
 3. Upload, then pair:
    - macOS: Audio MIDI Setup -> Window -> Show MIDI Studio -> Bluetooth icon -> Connect.

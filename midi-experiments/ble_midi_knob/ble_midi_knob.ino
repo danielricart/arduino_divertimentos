@@ -12,6 +12,9 @@
       CC 29/30/31  red / green / blue of all LEDs (0-127)
     LEDs start off until the computer sends a brightness.
 
+  - Modulino Movement, gyroscope rotation speed -> CC 102/103/104 (roll/pitch/yaw),
+    64 when still, lower/higher when rotating one way or the other.
+
   Uses the standard BLE MIDI GATT service, so Windows 10/11 and macOS
   need no extra drivers.
 
@@ -33,6 +36,9 @@
 const uint8_t KNOB_ADDRESS    = 0x3A;
 const uint8_t BUTTONS_ADDRESS = 0x3E;
 const uint8_t PIXELS_ADDRESS  = 0x36;
+// The Movement module is a plain LSM6DSOX (no Modulino MCU), so this is already the bus address.
+// Some modules use 0x6B instead (the library lists both as fixed addresses).
+const uint8_t MOVEMENT_ADDRESS = 0x6A;
 
 const char*   DEVICE_NAME     = "ESP32-C3 MIDI Knob";  // the last 4 hex digits of the Bluetooth MAC are appended
 const uint8_t MIDI_CHANNEL    = 1;
@@ -48,6 +54,13 @@ const uint8_t PIXEL_CC_GREEN  = 30;
 const uint8_t PIXEL_CC_BLUE   = 31;
 const uint8_t NUM_PIXELS      = 8;
 
+// Gyroscope -> CC: rotation speed in degrees per second, centred at 64 when still
+const uint8_t GYRO_CC[3]          = {102, 103, 104};  // roll, pitch, yaw
+const float   GYRO_FULL_SCALE_DPS = 250.0;  // speed that reaches 0 or 127
+const float   GYRO_DEADZONE_DPS   = 5.0;    // below this the axis counts as still (sensor noise)
+const float   GYRO_SMOOTHING      = 0.3;    // 0..1, weight of each new reading (lower = smoother)
+const uint32_t GYRO_SEND_MS       = 20;     // at most 50 CC updates per second per axis
+
 const int     KNOB_STEP       = 2;     // CC change per encoder detent
 const uint8_t  DISCONNECT_BUTTON = 2;  // 0 = A, 1 = B, 2 = C
 const uint32_t LONG_PRESS_MS  = 5000;  // hold the disconnect button this long to disconnect
@@ -59,6 +72,7 @@ BLEMIDI_CREATE_INSTANCE(DEVICE_NAME, MIDI)
 ModulinoKnob    knob(KNOB_ADDRESS);
 ModulinoButtons buttons(BUTTONS_ADDRESS);
 ModulinoPixels  pixels(PIXELS_ADDRESS);
+ModulinoMovement movement(MOVEMENT_ADDRESS);
 
 // Pixels state, all 0-127 as received over MIDI. Colour starts white; LEDs start off.
 uint8_t ledLevel[NUM_PIXELS] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -68,6 +82,10 @@ bool    pixelsDirty = false;
 
 bool connected = false;
 int  lastCC    = -1;
+
+bool  movementOk      = false;
+float gyroFiltered[3] = {0, 0, 0};
+int   lastGyroCC[3]   = {-1, -1, -1};
 
 const uint8_t NUM_BUTTONS = 3;
 bool     buttonDown[NUM_BUTTONS]  = {false, false, false};
@@ -117,6 +135,26 @@ void refreshPixels() {
   pixelsDirty = false;
 }
 
+// Maps a rotation speed onto 0..127 with 64 meaning "still".
+int gyroToCC(float dps) {
+  if (fabsf(dps) < GYRO_DEADZONE_DPS) dps = 0;
+  int cc = 64 + (int)lroundf(dps / GYRO_FULL_SCALE_DPS * 63.0f);
+  return constrain(cc, 0, 127);
+}
+
+void updateGyro() {
+  if (!movementOk || !movement.update()) return;
+  float rates[3] = {movement.getRoll(), movement.getPitch(), movement.getYaw()};
+  for (uint8_t i = 0; i < 3; i++) {
+    gyroFiltered[i] += GYRO_SMOOTHING * (rates[i] - gyroFiltered[i]);
+    int cc = gyroToCC(gyroFiltered[i]);
+    if (cc != lastGyroCC[i] && connected) {
+      MIDI.sendControlChange(GYRO_CC[i], cc, MIDI_CHANNEL);
+      lastGyroCC[i] = cc;
+    }
+  }
+}
+
 void releaseAllNotes() {
   for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
     if (buttonDown[i] && connected) MIDI.sendNoteOff(BUTTON_NOTES[i], 0, MIDI_CHANNEL);
@@ -147,11 +185,14 @@ void setup() {
   pixels.clear();
   pixels.show();
   knob.set(0);
+  movementOk = movement.begin();
   Serial.printf("Knob at 0x%02X, buttons at 0x%02X\n", knob.getAddress(), buttons.getAddress());
+  Serial.printf("Movement at 0x%02X: %s\n", MOVEMENT_ADDRESS, movementOk ? "found" : "NOT found");
 
   BLEMIDI.setHandleConnected([]() {
     connected = true;
-    lastCC = -1;             // force a resend of the current value
+    lastCC = -1;             // force a resend of the current values
+    for (uint8_t i = 0; i < 3; i++) lastGyroCC[i] = -1;
     Serial.println("BLE MIDI connected");
   });
   BLEMIDI.setHandleDisconnected([]() {
@@ -192,6 +233,12 @@ void loop() {
     if (count < 0) { count = 0; knob.set(0); }
     if (count > maxCount) { count = maxCount; knob.set(maxCount); }
     sendKnobValue(min(count * KNOB_STEP, 127));
+  }
+
+  static uint32_t lastGyroSend = 0;
+  if (millis() - lastGyroSend >= GYRO_SEND_MS) {
+    lastGyroSend = millis();
+    updateGyro();
   }
 
   // Buttons A/B/C: each sends its own note while held; holding the disconnect button disconnects
