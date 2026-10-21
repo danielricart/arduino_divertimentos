@@ -11,6 +11,7 @@ factory Bluetooth MAC, so several boards can be told apart. Serial prints the fu
 - Modulino Buttons (3 buttons A, B, C) -> notes 60, 62, 64, on while held and off on release
 - Modulino Pixels (8 RGB LEDs) controlled from the computer on channel 1: CC 20-27 = brightness of LED 1-8, CC 28 = master brightness, CC 29/30/31 = red/green/blue. LEDs start off until a brightness is sent. The Knob stays on CC 1.
 - Modulino Movement: gyroscope rotation speed -> CC 102/103/104 (roll/pitch/yaw), 64 when still. Tune range, dead zone and smoothing with the `GYRO_*` constants in the sketch.
+- Modulino Movement: tap the board or the table it rests on -> note 36 (kick) on channel 10, using the sensor's built-in tap detection. Velocity is a rough estimate of tap strength. Tune sensitivity with `TAP_THRESHOLD` (lower = more sensitive) and the `TAP_*` constants.
 - Hold button C for 5 s to disconnect from the computer. Pairing is kept, so the same computer can reconnect and another computer can connect while the device advertises
 
 ### MIDI map (channel 1)
@@ -28,6 +29,7 @@ factory Bluetooth MAC, so several boards can be told apart. Serial prints the fu
 | Gyro roll speed | Out | CC 102 | 0-127, 64 when still |
 | Gyro pitch speed | Out | CC 103 | 0-127, 64 when still |
 | Gyro yaw speed | Out | CC 104 | 0-127, 64 when still |
+| Tap (Movement) | Out | Note 36 (kick) on **channel 10** | velocity 20-127 from tap strength (rough); each tap is its own note |
 | Brightness - LED0 | In | CC 20 | 0-127 |
 | Brightness - LED1 | In | CC 21 | 0-127 |
 | Brightness - LED2 | In | CC 22 | 0-127 |
