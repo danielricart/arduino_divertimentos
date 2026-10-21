@@ -14,6 +14,8 @@
 
   - Modulino Movement, gyroscope rotation speed -> CC 102/103/104 (roll/pitch/yaw),
     64 when still, lower/higher when rotating one way or the other.
+  - Modulino Movement, tap (sensor's built-in tap engine) -> note 36 (kick) on channel 10,
+    velocity estimated from how hard the tap was. Two quick taps give two notes.
 
   Uses the standard BLE MIDI GATT service, so Windows 10/11 and macOS
   need no extra drivers.
@@ -61,6 +63,16 @@ const float   GYRO_DEADZONE_DPS   = 5.0;    // below this the axis counts as sti
 const float   GYRO_SMOOTHING      = 0.3;    // 0..1, weight of each new reading (lower = smoother)
 const uint32_t GYRO_SEND_MS       = 20;     // at most 50 CC updates per second per axis
 
+// Tap -> drum note, using the LSM6DSOX's built-in single-tap detection
+const uint8_t  TAP_NOTE         = 36;   // General MIDI kick drum
+const uint8_t  TAP_CHANNEL      = 10;   // General MIDI drum channel
+const uint8_t  TAP_THRESHOLD    = 4;    // 1..31, x 125 mg at the +-4 g range (4 = 0.5 g); lower = more sensitive
+const uint8_t  TAP_AXES         = 0x02; // TAP_CFG0 enable bits: 0x02 = Z, 0x04 = Y, 0x08 = X (Z = tapping the table or the board's top)
+const uint32_t TAP_NOTE_MS      = 50;   // note length sent to the computer
+const float    TAP_VEL_MIN_G    = 0.1;  // peak acceleration change mapped to the lowest velocity
+const float    TAP_VEL_MAX_G    = 2.0;  // ... and to velocity 127
+const uint8_t  TAP_VEL_FLOOR    = 20;   // velocity used for the lightest taps
+
 const int     KNOB_STEP       = 2;     // CC change per encoder detent
 const uint8_t  DISCONNECT_BUTTON = 2;  // 0 = A, 1 = B, 2 = C
 const uint32_t LONG_PRESS_MS  = 5000;  // hold the disconnect button this long to disconnect
@@ -86,6 +98,11 @@ int  lastCC    = -1;
 bool  movementOk      = false;
 float gyroFiltered[3] = {0, 0, 0};
 int   lastGyroCC[3]   = {-1, -1, -1};
+
+float    lastAccel[3]  = {0, 0, 0};
+float    accelPeak     = 0;    // largest recent change in acceleration, decays every poll
+bool     tapNoteOn     = false;
+uint32_t tapNoteOffAt  = 0;
 
 const uint8_t NUM_BUTTONS = 3;
 bool     buttonDown[NUM_BUTTONS]  = {false, false, false};
@@ -135,6 +152,73 @@ void refreshPixels() {
   pixelsDirty = false;
 }
 
+// ---- Raw LSM6DSOX register access (the Modulino library does not expose tap detection) ----
+// Register addresses and bit layouts from ST's lsm6dsox_reg.h.
+const uint8_t LSM6DSOX_TAP_SRC     = 0x1C;  // bit 6 TAP_IA, bit 5 SINGLE_TAP
+const uint8_t LSM6DSOX_CTRL1_XL    = 0x10;
+const uint8_t LSM6DSOX_TAP_CFG0    = 0x56;
+const uint8_t LSM6DSOX_TAP_CFG1    = 0x57;
+const uint8_t LSM6DSOX_TAP_CFG2    = 0x58;
+const uint8_t LSM6DSOX_TAP_THS_6D  = 0x59;
+const uint8_t LSM6DSOX_INT_DUR2    = 0x5A;
+const uint8_t LSM6DSOX_WAKE_UP_THS = 0x5B;
+const uint8_t LSM6DSOX_MD1_CFG     = 0x5E;
+
+void imuWrite(uint8_t reg, uint8_t value) {
+  Wire.beginTransmission(MOVEMENT_ADDRESS);
+  Wire.write(reg);
+  Wire.write(value);
+  Wire.endTransmission();
+}
+
+int imuRead(uint8_t reg) {
+  Wire.beginTransmission(MOVEMENT_ADDRESS);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return -1;
+  if (Wire.requestFrom(MOVEMENT_ADDRESS, (uint8_t)1) != 1) return -1;
+  return Wire.read();
+}
+
+// Called after movement.begin(), which sets the accelerometer to 104 Hz, +-4 g (0x4A).
+void setupTapDetection() {
+  imuWrite(LSM6DSOX_CTRL1_XL, 0x6A);          // 417 Hz for the tap engine; keep +-4 g so the library's scaling stays right
+  imuWrite(LSM6DSOX_TAP_CFG0, 0x40 | TAP_AXES | 0x01);  // clear on read, chosen axes, latched
+  imuWrite(LSM6DSOX_TAP_CFG1, TAP_THRESHOLD & 0x1F);    // X threshold, default axis priority
+  imuWrite(LSM6DSOX_TAP_CFG2, 0x80 | (TAP_THRESHOLD & 0x1F));  // enable basic interrupts, Y threshold
+  imuWrite(LSM6DSOX_TAP_THS_6D, TAP_THRESHOLD & 0x1F);  // Z threshold
+  imuWrite(LSM6DSOX_INT_DUR2, (3 << 2) | 3);  // quiet 29 ms, shock 57 ms at 417 Hz (ST's example values)
+  imuWrite(LSM6DSOX_WAKE_UP_THS, 0x00);       // single tap only: each tap is reported on its own
+  imuWrite(LSM6DSOX_MD1_CFG, 0x40);           // route single tap to INT1 (not wired; needed for the event logic)
+}
+
+// Tracks how sharply the acceleration changes, as a rough measure of tap strength.
+void trackAccelPeak() {
+  float a[3] = {movement.getX(), movement.getY(), movement.getZ()};
+  float change = sqrtf(sq(a[0] - lastAccel[0]) + sq(a[1] - lastAccel[1]) + sq(a[2] - lastAccel[2]));
+  for (uint8_t i = 0; i < 3; i++) lastAccel[i] = a[i];
+  accelPeak = max(accelPeak * 0.5f, change);
+}
+
+uint8_t tapVelocity() {
+  if (accelPeak <= TAP_VEL_MIN_G) return TAP_VEL_FLOOR;
+  float t = (accelPeak - TAP_VEL_MIN_G) / (TAP_VEL_MAX_G - TAP_VEL_MIN_G);
+  return constrain((int)(TAP_VEL_FLOOR + t * (127 - TAP_VEL_FLOOR)), TAP_VEL_FLOOR, 127);
+}
+
+void updateTap() {
+  if (tapNoteOn && (int32_t)(millis() - tapNoteOffAt) >= 0) {
+    if (connected) MIDI.sendNoteOff(TAP_NOTE, 0, TAP_CHANNEL);
+    tapNoteOn = false;
+  }
+  int src = imuRead(LSM6DSOX_TAP_SRC);
+  if (src < 0 || !(src & 0x20)) return;   // SINGLE_TAP
+  if (!connected) return;
+  if (tapNoteOn) MIDI.sendNoteOff(TAP_NOTE, 0, TAP_CHANNEL);  // retrigger
+  MIDI.sendNoteOn(TAP_NOTE, tapVelocity(), TAP_CHANNEL);
+  tapNoteOn = true;
+  tapNoteOffAt = millis() + TAP_NOTE_MS;
+}
+
 // Maps a rotation speed onto 0..127 with 64 meaning "still".
 int gyroToCC(float dps) {
   if (fabsf(dps) < GYRO_DEADZONE_DPS) dps = 0;
@@ -142,8 +226,8 @@ int gyroToCC(float dps) {
   return constrain(cc, 0, 127);
 }
 
+// Uses the readings taken by movement.update() in loop().
 void updateGyro() {
-  if (!movementOk || !movement.update()) return;
   float rates[3] = {movement.getRoll(), movement.getPitch(), movement.getYaw()};
   for (uint8_t i = 0; i < 3; i++) {
     gyroFiltered[i] += GYRO_SMOOTHING * (rates[i] - gyroFiltered[i]);
@@ -186,6 +270,7 @@ void setup() {
   pixels.show();
   knob.set(0);
   movementOk = movement.begin();
+  if (movementOk) setupTapDetection();
   Serial.printf("Knob at 0x%02X, buttons at 0x%02X\n", knob.getAddress(), buttons.getAddress());
   Serial.printf("Movement at 0x%02X: %s\n", MOVEMENT_ADDRESS, movementOk ? "found" : "NOT found");
 
@@ -235,10 +320,14 @@ void loop() {
     sendKnobValue(min(count * KNOB_STEP, 127));
   }
 
-  static uint32_t lastGyroSend = 0;
-  if (millis() - lastGyroSend >= GYRO_SEND_MS) {
-    lastGyroSend = millis();
-    updateGyro();
+  if (movementOk && movement.update()) {
+    trackAccelPeak();
+    updateTap();
+    static uint32_t lastGyroSend = 0;
+    if (millis() - lastGyroSend >= GYRO_SEND_MS) {
+      lastGyroSend = millis();
+      updateGyro();
+    }
   }
 
   // Buttons A/B/C: each sends its own note while held; holding the disconnect button disconnects
